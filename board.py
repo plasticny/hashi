@@ -15,12 +15,12 @@ class Board:
         """Get box in `pos`"""
         # if out of bound
         if pos.row < 0 or pos.row >= self.height or pos.col < 0 or pos.col >= self.width:
-               return None
+            return None
         return self.board[pos.row][pos.col]
     
     def get_relative(self, box:Box, dir:Direction) -> Box:
         """Get the nearest box in `dir` from `box`"""
-        return self.get(box.position.add(dir))
+        return self.get(box.position.move_to(dir))
 
     def print_board(self):
         # header
@@ -41,9 +41,9 @@ class Board:
             for c_idx, box in enumerate(row):
                 padding_col = '  '
                 if c_idx < self.width-1:
-                    if (box.is_node() and box.node_right is not None):
+                    if isinstance(box, Node) and box.node_right is not None:
                         padding_col = '--' if box.right_line_cnt == 1 else '=='
-                    if (box.is_line() and box.dir == Direction.RIGHT()):
+                    if isinstance(box, HorizonLine):
                         padding_col = '==' if box.is_double else '--'
                 print(box, end=padding_col)
             print()
@@ -54,143 +54,103 @@ class Board:
             print(f'{Fore.CYAN}  #{Style.RESET_ALL}', end='')
             for c_idx, box in enumerate(row):
                 col = '  '
-                if (box.is_node() and box.node_bottom is not None):
+                if isinstance(box, Node) and box.node_bottom is not None:
                     col = ' |' if box.bottom_line_cnt == 1 else '||'
-                if (box.is_line() and box.dir == Direction.UP()):
+                if isinstance(box, VerticalLine):
                     col = '||' if box.is_double else ' |'
                 print(col, end='  ')
             print()
             
-
     def generate(self, _n:int):
         """
             Generate a new game board
             Args:
                 `n`: number of node in the board
         """
-        def _find_empty_boxes(__node:Node, __dir:Direction) -> list[Position]:
-            """Find all empty boxed in a direction from a node"""
-            __res = []
-            __box = self.get_relative(__node, __dir)
-            while __box is not None and __box.is_empty():
-                __res.append(__box.position)
-                __box = self.get_relative(__box, __dir)
-            return __res
-
-        # first constrcut an answer board
+        # constrcut an empty board
         self.board = [
             [Box(row, col) for col in range(self.width)] for row in range(self.height)
         ]
 
-        # choices n boxes as node
+        # created nodes the can be connected to other nodes
         _avai_node_set : set[Node] = set()
-        _dir_ls = [Direction.UP(), Direction.BOTTOM(), Direction.LEFT(), Direction.RIGHT()]
-        for _i in range(_n):
-            if _i == 0:
-                # first node, randomly choice a box
-                _row = randint(0, self.height-1)
-                _col = randint(0, self.width-1)
+
+        # choose first random node
+        _first_node = Node(randint(0, self.height-1), randint(0, self.width-1))
+        self.board[_first_node.position.row][_first_node.position.col] = _first_node
+        _avai_node_set.add(_first_node)
+        self.node_ls.append(_first_node)
+
+        # choose n-1 more boxes as node
+        for _ in range(_n-1):
+            # find a node and a direction that can create another node
+            _from_node : Node = None
+            _dir : Direction = None
+            while _from_node is None or _dir is None:
+                _from_node = choice(list(_avai_node_set))
                 
-                _node = self.board[_row][_col].to_Node()
-                self.board[_row][_col] = _node
+                _unlinked_dir_ls = _from_node.get_unlinked_dir()
+                if len(_unlinked_dir_ls) == 0:
+                    _avai_node_set.remove(_from_node)
+                    continue
                 
-                _avai_node_set.add(_node)
-                self.node_ls.append(_node)
-            else:
-                # after first node
-                _pos = None
-                _dir = None
-
-                # find an availabe node to connect
-                while _pos is None:
-                    _from_node = choice(list(_avai_node_set))
-                    shuffle(_dir_ls)
-
-                    for _d in _dir_ls:
-                        _empty_box_pos_ls = _find_empty_boxes(_from_node, _d)
-                        if len(_empty_box_pos_ls) != 0:
-                            _pos = choice(_empty_box_pos_ls)
-                            _dir = _d
-                            break
-
-                    # if pos is None in here, from_node cannot connect more node
-                    # remove it from avai_node_set
-                    if _pos is None:
-                        _avai_node_set.remove(_from_node)
-
-                _to_node = self.get(_pos).to_Node()
+                # randomly choose a direction
+                _dir = choice(_unlinked_dir_ls)
                 
-                # add to board
-                self.board[_pos.row][_pos.col] = _to_node
-                
-                _avai_node_set.add(_to_node)
-                self.node_ls.append(_to_node)
+            # choose a random empty box in this direction
+            _empty_box_ls = []
+            _b = self.get_relative(_from_node, _dir)
+            while _b is not None and not isinstance(_b, Node) and not isinstance(_b, Line):
+                _empty_box_ls.append(_b)
+                _b = self.get_relative(_b, _dir)
+            _box : Box = choice(_empty_box_ls)
+            
+            # convert box to node
+            _to_node = Node(_box.position.row, _box.position.col)
+            self.board[_box.position.row][_box.position.col] = _to_node
+            _avai_node_set.add(_to_node)
+            self.node_ls.append(_to_node)
 
-                # draw a line
+            # draw a line
+            self.draw_line(_from_node, _to_node)
+            # increase number of line of both node
+            _from_node.n += 1
+            _to_node.n += 1
+            
+            # 50% chance to make it double
+            if randint(0, 1) == 1:
                 self.draw_line(_from_node, _to_node)
-
-                # increase line counter of both node
                 _from_node.n += 1
                 _to_node.n += 1
-                
-                # set linked node
-                _from_node.link_node(_to_node, _dir)
-                _to_node.link_node(_from_node, _dir.opposite())
-
-        # for each connection, 50% chance to make it double
-        for _node in self.node_ls:
-            if _node.node_right is not None and randint(0, 1) == 1:
-                # draw a line
-                self.draw_line(_node, _node.node_right)
-
-                # increase line counter of both node
-                _node.n += 1
-                _node.node_right.n += 1
-                
-                # set linked node
-                _node.link_node(_node.node_right, Direction.RIGHT())
-                _node.node_right.link_node(_node, Direction.LEFT())
-                
-            if _node.node_bottom is not None and randint(0, 1) == 1:
-                # draw a line
-                self.draw_line(_node, _node.node_bottom)
-
-                # increase line counter of both node
-                _node.n += 1
-                _node.node_bottom.n += 1
-                
-                # set linked node
-                _node.link_node(_node.node_bottom, Direction.BOTTOM())
-                _node.node_bottom.link_node(_node, Direction.UP())
                 
         # clear all link
         for r_idx, row in enumerate(self.board):
             for c_idx, box in enumerate(row):
-                if box.is_node():
+                if isinstance(box, Node):
                     box.clear_link()
-                elif box.is_line():
-                    self.board[r_idx][c_idx] = box.to_Box()
+                elif isinstance(box, Line):
+                    self.board[r_idx][c_idx] = Box(r_idx, c_idx)
         
     def draw_line(self, from_node:Node, to_node:Node):
-        horizon = from_node.position.row == to_node.position.row 
-        vertical = from_node.position.col == to_node.position.col
-        assert horizon or vertical
-
-        dir = from_node.dir_to(to_node)
+        dir = from_node.position.dir_to(to_node.position)
+        
+        if dir.is_horizontal():
+            line_class = HorizonLine
+        elif dir.is_vertical():
+            line_class = VerticalLine
+        else:
+            raise Exception('Drawing diagonal line')
+        
+        from_node.link_node(to_node)
+        to_node.link_node(from_node)
+        
         box = self.get_relative(from_node, dir)
         while box.position != to_node.position:
-            if horizon:
-                if box.is_line():
-                    box.is_double = True
-                else:
-                    _line = box.to_hl()
-                    self.board[box.position.row][box.position.col] = _line
+            if isinstance(box, Line):
+                box.is_double = True
             else:
-                if box.is_line():
-                    box.is_double = True
-                else:
-                    _line = box.to_vl()
-                    self.board[box.position.row][box.position.col] = _line
+                _line = line_class(box.position.row, box.position.col)
+                self.board[box.position.row][box.position.col] = _line
             box = self.get_relative(box, dir)
 
 board = Board(15, 10)
