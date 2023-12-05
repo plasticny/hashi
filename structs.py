@@ -1,7 +1,7 @@
 from __future__ import annotations
-from enum import Enum
+from colorama import Fore, Style
 
-class Direction():
+class Direction:
     """Vector that represent a direction"""
     @staticmethod
     def UP() -> Direction:
@@ -72,6 +72,9 @@ class Box:
     def __str__(self):
         return '  '
     
+    def is_empty(self) -> bool:
+        return True
+    
 # Node
 class Node(Box):
     def __init__(self, row, col):
@@ -91,7 +94,30 @@ class Node(Box):
         self.right_line_cnt : int = 0
 
     def __str__(self):
-        return f"${self.n}"
+        line_cnt = self.get_line_cnt()
+        if self.n == line_cnt:
+            color = Fore.GREEN
+        elif self.n > line_cnt:
+            color = Fore.YELLOW
+        else:
+            color = Fore.RED
+        return f"{color}${self.n}{Style.RESET_ALL}"
+    
+    def is_empty(self) -> bool:
+        return False
+    
+    def get_line_cnt(self) -> int:
+        return self.up_line_cnt + self.bottom_line_cnt + self.left_line_cnt + self.right_line_cnt
+    
+    def get_line_cnt_in_dir(self, _dir:Direction) -> int:
+        if _dir == Direction.UP():
+            return self.up_line_cnt
+        elif _dir == Direction.BOTTOM():
+            return self.bottom_line_cnt
+        elif _dir == Direction.LEFT():
+            return self.left_line_cnt
+        elif _dir == Direction.RIGHT():
+            return self.right_line_cnt
     
     def get_node_in_dir(self, _dir:Direction) -> Node:
         if _dir == Direction.UP():
@@ -112,6 +138,18 @@ class Node(Box):
         if self.left_line_cnt == 0:
             res.append(Direction.LEFT())
         if self.right_line_cnt == 0:
+            res.append(Direction.RIGHT())
+        return res
+    
+    def get_linked_dir(self) -> list[Direction]:
+        res = []
+        if self.up_line_cnt > 0:
+            res.append(Direction.UP())
+        if self.bottom_line_cnt > 0:
+            res.append(Direction.BOTTOM())
+        if self.left_line_cnt > 0:
+            res.append(Direction.LEFT())
+        if self.right_line_cnt > 0:
             res.append(Direction.RIGHT())
         return res
     
@@ -139,36 +177,35 @@ class Node(Box):
             
     def unlink_dir(self, _dir:Direction):
         if _dir == Direction.UP():
-            self.node_up.bottom_line_cnt = 0
-            self.up_line_cnt = 0
-            self.node_up.node_bottom = None
-            self.node_up = None
+            self.node_up.bottom_line_cnt -= 1
+            self.up_line_cnt -= 1
+            if self.node_up.bottom_line_cnt == 0:
+                self.node_up.node_bottom = None
+                self.node_up = None
         elif _dir == Direction.BOTTOM():
-            self.node_bottom.up_line_cnt = 0
-            self.bottom_line_cnt = 0
-            self.node_bottom.node_up = None
-            self.node_bottom = None
+            self.node_bottom.up_line_cnt -= 1
+            self.bottom_line_cnt -= 1
+            if self.node_bottom.up_line_cnt == 0:
+                self.node_bottom.node_up = None
+                self.node_bottom = None
         elif _dir == Direction.LEFT():
-            self.node_left.right_line_cnt = 0
-            self.left_line_cnt = 0
-            self.node_left.node_right = None
-            self.node_left = None
+            self.node_left.right_line_cnt -= 1
+            self.left_line_cnt -= 1
+            if self.node_left.right_line_cnt == 0:
+                self.node_left.node_right = None
+                self.node_left = None
         elif _dir == Direction.RIGHT():
-            self.node_right.left_line_cnt = 0
-            self.right_line_cnt = 0
-            self.node_right.node_left = None
-            self.node_right = None
+            self.node_right.left_line_cnt -= 1
+            self.right_line_cnt -= 1
+            if self.node_right.left_line_cnt == 0:
+                self.node_right.node_left = None
+                self.node_right = None
             
     def clear_link(self):
-        if self.node_up is not None:
-            self.unlink_dir(Direction.UP())
-        if self.node_bottom is not None:
-            self.unlink_dir(Direction.BOTTOM())
-        if self.node_left is not None:
-            self.unlink_dir(Direction.LEFT())
-        if self.node_right is not None:
-            self.unlink_dir(Direction.RIGHT())
-        
+        for dir in self.get_linked_dir():
+            for _ in range(self.get_line_cnt_in_dir(dir)):
+                self.unlink_dir(dir)
+                    
 # Line 
 class Line(Box):
     def __init__(self, dir:Direction, row, col):
@@ -176,6 +213,9 @@ class Line(Box):
         
         self.dir = dir
         self.is_double : bool = False
+        
+    def is_empty(self) -> bool:
+        return False
 
 class HorizonLine(Line):
     def __init__(self, row, col):
