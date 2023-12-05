@@ -146,6 +146,7 @@ if __name__ == '__main__':
   
   # print player guide
   print(f"{Fore.CYAN}===== Player guide ====={Style.RESET_ALL}")
+  print(f'{Fore.GREEN}You can wiki hashi for game rule{Style.RESET_ALL}')
   print(f'{Fore.YELLOW}Input Format{Style.RESET_ALL}: {"{col, 2 char}{row, 2 char}{direction, 1 char}{action, remaining char}"}')
   print(f'{Fore.YELLOW}Direction{Style.RESET_ALL}: "8" for up, "2" for down, "4" for left, "6" for right')
   print(f'{Fore.YELLOW}Action{Style.RESET_ALL}: ""/"d" for draw, "dd" for double draw, "e" for erase, "ee" for double erase')
