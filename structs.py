@@ -176,25 +176,32 @@ class Node(Box):
             self.right_line_cnt += 1
             
     def unlink_dir(self, _dir:Direction):
+        """
+            Erase a line in a direction
+        """
         if _dir == Direction.UP():
+            assert self.up_line_cnt > 0
             self.node_up.bottom_line_cnt -= 1
             self.up_line_cnt -= 1
             if self.node_up.bottom_line_cnt == 0:
                 self.node_up.node_bottom = None
                 self.node_up = None
         elif _dir == Direction.BOTTOM():
+            assert self.bottom_line_cnt > 0
             self.node_bottom.up_line_cnt -= 1
             self.bottom_line_cnt -= 1
             if self.node_bottom.up_line_cnt == 0:
                 self.node_bottom.node_up = None
                 self.node_bottom = None
         elif _dir == Direction.LEFT():
+            assert self.left_line_cnt > 0
             self.node_left.right_line_cnt -= 1
             self.left_line_cnt -= 1
             if self.node_left.right_line_cnt == 0:
                 self.node_left.node_right = None
                 self.node_left = None
         elif _dir == Direction.RIGHT():
+            assert self.right_line_cnt > 0
             self.node_right.left_line_cnt -= 1
             self.right_line_cnt -= 1
             if self.node_right.left_line_cnt == 0:
