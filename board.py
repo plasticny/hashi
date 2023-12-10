@@ -11,6 +11,7 @@ class Board:
         self.board:list[list[Box]] = []
         self.node_ls:list[Node] = []
     
+    # ==================== Get box in board ==================== #
     def get(self, pos:Position) -> Box:
         """Get box in `pos`"""
         # if out of bound
@@ -28,6 +29,8 @@ class Board:
         while _box is not None and _box.is_empty():
             _box = self.get_relative(_box, dir)
         return _box
+    # ==================== Get box in board ==================== #
+
 
     def print_board(self):
         def print_col_number():
@@ -193,6 +196,8 @@ class Board:
                 self.board[box.position.row][box.position.col] = Box(box.position.row, box.position.col)
             box = self.get_relative(box, dir)
 
+
+    # ==================== Board status checkers ==================== #
     def is_finish(self) -> bool:
         """
             Check if all node has just enough line connected to it,\n
@@ -217,3 +222,11 @@ class Board:
         
         # check if all node can be reached
         return len(_visited_node_set) == len(self.node_ls)
+    
+    def is_all_node_full(self):
+        """Check if all node are full or overfull"""
+        for node in self.node_ls:
+            if node.n > node.get_line_cnt():
+                return False
+        return True
+    # ==================== Board status checkers ==================== #

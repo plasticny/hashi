@@ -1,6 +1,9 @@
 from __future__ import annotations
 from colorama import Fore, Style
 
+class Vector:
+    pass
+
 class Direction:
     """Vector that represent a direction"""
     @staticmethod
@@ -105,6 +108,9 @@ class Node(Box):
     
     def is_empty(self) -> bool:
         return False
+    def is_just_full(self) -> bool:
+        """Check if the number of line connected to this node is just enough"""
+        return self.get_line_cnt() == self.n
     
     def get_line_cnt(self) -> int:
         return self.up_line_cnt + self.bottom_line_cnt + self.left_line_cnt + self.right_line_cnt
