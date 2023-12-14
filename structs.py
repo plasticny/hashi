@@ -1,71 +1,10 @@
+"""
+    Structures on the game board
+"""
+
 from __future__ import annotations
 from colorama import Fore, Style
-
-class Vector:
-    pass
-
-class Direction:
-    """Vector that represent a direction"""
-    @staticmethod
-    def UP() -> Direction:
-        return Direction(-1, 0)
-    @staticmethod
-    def BOTTOM() -> Direction:
-        return Direction(1, 0)
-    @staticmethod
-    def LEFT() -> Direction:
-        return Direction(0, -1)
-    @staticmethod
-    def RIGHT() -> Direction:
-        return Direction(0, 1)
-
-    def __init__(self, v, h):
-        """
-            Args:
-                v (number): vertical scalar, negative means up
-                h (number): horizontal scalar, negative means left
-        """
-        self.v = v
-        self.h = h
-    def __eq__(self, _v):
-        assert isinstance(_v, Direction)        
-        return self.v == _v.v and self.h == _v.h
-
-    def is_horizontal(self) -> bool:
-        return self.v == 0 and self.h != 0
-    def is_vertical(self) -> bool:
-        return self.h == 0 and self.v != 0
-
-    def add(self, _dir) -> Direction:
-        assert isinstance(_dir, Direction)
-        return Direction(self.v+_dir.v, self.h+_dir.h)
-    def opposite(self) -> Direction:
-        assert isinstance(self, Direction)
-        return Direction(-self.v, -self.h)
-
-class Position:
-    """Position in the game board"""
-    def __init__(self, row, col):
-        self.row = row
-        self.col = col
-    def __str__(self):
-        return f"{self.row} {self.col}"
-    def __eq__(self, _value):
-        assert isinstance(_value, Position)
-        return self.row == _value.row and self.col == _value.col
-    
-    def move_to(self, dir) -> Position:
-        assert isinstance(dir, Direction)
-        return Position(self.row+dir.v, self.col+dir.h)
-    
-    def dir_to(self, _pos) -> Direction:
-        assert isinstance(_pos, Position)
-        _dv = _pos.row - self.row
-        _dh = _pos.col - self.col
-        
-        _v = int(_dv / abs(_dv)) if _dv != 0 else 0
-        _h = int(_dh / abs(_dh)) if _dh != 0 else 0
-        return Direction(_v, _h)
+from geometric import Direction, Position
 
 # an empty box in the game board
 class Box:
@@ -111,6 +50,8 @@ class Node(Box):
     def is_just_full(self) -> bool:
         """Check if the number of line connected to this node is just enough"""
         return self.get_line_cnt() == self.n
+    def is_over_full(self) -> bool:
+        return self.get_line_cnt() > self.n
     
     def get_line_cnt(self) -> int:
         return self.up_line_cnt + self.bottom_line_cnt + self.left_line_cnt + self.right_line_cnt
@@ -213,12 +154,7 @@ class Node(Box):
             if self.node_right.left_line_cnt == 0:
                 self.node_right.node_left = None
                 self.node_right = None
-            
-    def clear_link(self):
-        for dir in self.get_linked_dir():
-            for _ in range(self.get_line_cnt_in_dir(dir)):
-                self.unlink_dir(dir)
-                    
+                                
 # Line 
 class Line(Box):
     def __init__(self, dir:Direction, row, col):
@@ -241,3 +177,12 @@ class VerticalLine(Line):
         super().__init__(Direction.UP(), row, col)
     def __str__(self):
         return '||' if self.is_double else ' |'
+
+# Wall
+class Wall(Box):
+    def __init__(self, row, col):
+        super().__init__(row, col)
+    def __str__(self):
+        return f'{Fore.BLACK}##{Style.RESET_ALL}'
+    def is_empty(self) -> bool:
+        return False

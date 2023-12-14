@@ -1,10 +1,13 @@
-from structs import *
+from structs import Box, Node, Line, HorizonLine, VerticalLine, Wall
+from geometric import Position, Direction
 from random import choice, randint
 from colorama import Fore, Style
+from math import ceil
 
 class Board:
     def __init__(self, width:int, height:int):
-        assert width > 0 and height > 0
+        if not(width >= 2 and height >=2):
+            raise Exception('Board size must be at least 2x2')
 
         self.width = width
         self.height = height
@@ -28,136 +31,11 @@ class Board:
         _box = self.get_relative(box, dir)
         while _box is not None and _box.is_empty():
             _box = self.get_relative(_box, dir)
-        return _box
+        return _box    
     # ==================== Get box in board ==================== #
-
-
-    def print_board(self):
-        def print_col_number():
-            print(f'  {Fore.CYAN}#{Fore.WHITE}', end='')
-            for i in range(self.width):
-                if i < 10:
-                    print(0, end='')
-                print(i, end='  ' if i < self.width-1 else '')
-            print(f'{Fore.CYAN}#{Style.RESET_ALL}')
-            return
-        def print_horizon_line():
-            print(f'{Fore.CYAN}{"#"*((self.width+1)*4)}{Style.RESET_ALL}')
-            return
         
-        # header
-        print_col_number()
-        print_horizon_line()
-
-        # body
-        for r_idx, row in enumerate(self.board):
-            print(f'{Fore.WHITE}{"0" if r_idx < 10 else ""}{r_idx}{Fore.CYAN}#', end='')
-            print(Style.RESET_ALL, end='')
-            for c_idx, box in enumerate(row):
-                padding_col = ''
-                if c_idx < self.width-1:
-                    padding_col = '  '
-                    if isinstance(box, Node) and box.node_right is not None:
-                        padding_col = '--' if box.right_line_cnt == 1 else '=='
-                    if isinstance(box, HorizonLine):
-                        padding_col = '==' if box.is_double else '--'
-                print(box, end=padding_col)
-            print(f'{Fore.CYAN}#{Fore.WHITE}{"0" if r_idx < 10 else ""}{r_idx}')
-            
-            # padding row
-            if r_idx == self.height-1:
-                continue
-            print(f'{Fore.CYAN}  #{Style.RESET_ALL}', end='')
-            for c_idx, box in enumerate(row):
-                col = '  '
-                if isinstance(box, Node) and box.node_bottom is not None:
-                    col = ' |' if box.bottom_line_cnt == 1 else '||'
-                if isinstance(box, VerticalLine):
-                    col = '||' if box.is_double else ' |'
-                print(col, end='  ' if c_idx < self.width-1 else '')
-            print(f'{Fore.CYAN}#{Style.RESET_ALL}')
-            
-        # footer
-        print_horizon_line()
-        print_col_number()
-            
-    def generate(self, _n:int):
-        """
-            Generate a new game board
-            Args:
-                `n`: number of node in the board
-        """
-        assert _n > 1 and _n <= self.width * self.height
-        
-        # constrcut an empty board
-        self.board = [
-            [Box(row, col) for col in range(self.width)] for row in range(self.height)
-        ]
-
-        # choose first random node
-        _first_node = Node(randint(0, self.height-1), randint(0, self.width-1))
-        self.board[_first_node.position.row][_first_node.position.col] = _first_node
-        self.node_ls.append(_first_node)
-    
-        # created nodes the can be connected to other nodes
-        _avai_node_set : set[Node] = set()        
-        _avai_node_set.add(_first_node)
-
-        # choose n-1 more boxes as node
-        for _ in range(_n-1):
-            # find a node and a direction that can create another node
-            _from_node : Node = None
-            _dir : Direction = None
-            while _from_node is None or _dir is None:
-                _node = choice(list(_avai_node_set))
-                
-                _avai_dir_ls = []
-                for _dir in _node.get_unlinked_dir():
-                    _b = self.get_relative(_node, _dir)
-                    if _b is not None and _b.is_empty():
-                        _avai_dir_ls.append(_dir)
-                
-                if len(_avai_dir_ls) == 0:
-                    _avai_node_set.remove(_node)
-                    continue
-                                
-                _from_node = _node
-                _dir = choice(_avai_dir_ls)
-                
-            # choose a random empty box in this direction
-            _empty_box_ls = []
-            _b = self.get_relative(_from_node, _dir)
-            while _b is not None and _b.is_empty():
-                _empty_box_ls.append(_b)
-                _b = self.get_relative(_b, _dir)
-            _box : Box = choice(_empty_box_ls)
-            
-            # convert box to node
-            _to_node = Node(_box.position.row, _box.position.col)
-            self.board[_box.position.row][_box.position.col] = _to_node
-            _avai_node_set.add(_to_node)
-            self.node_ls.append(_to_node)
-
-            # draw a line, and increase number of line of both node
-            self.draw_line(_from_node, _to_node)
-            _from_node.n += 1
-            _to_node.n += 1
-            
-            # 50% chance to double it
-            if randint(0, 1) == 1:
-                self.draw_line(_from_node, _to_node)
-                _from_node.n += 1
-                _to_node.n += 1
-                
-        # clear all link
-        for r_idx, row in enumerate(self.board):
-            for c_idx, box in enumerate(row):
-                if isinstance(box, Node):
-                    box.clear_link()
-                elif isinstance(box, Line):
-                    self.board[r_idx][c_idx] = Box(r_idx, c_idx)
-        
-    def draw_line(self, from_node:Node, to_node:Node):
+    # ==================== Board Manipulation ==================== #
+    def draw_line(self, from_node:Node, to_node:Node):        
         dir = from_node.position.dir_to(to_node.position)
         
         if dir.is_horizontal():
@@ -196,8 +74,65 @@ class Board:
                 self.board[box.position.row][box.position.col] = Box(box.position.row, box.position.col)
             box = self.get_relative(box, dir)
 
+    def set_wall(self, pos:Position):
+        box = self.get(pos)
+        if not isinstance(box, Box):
+            raise Exception('Not a box')
+        if not box.is_empty():
+            raise Exception('Not an empty box')
+        self.board[pos.row][pos.col] = Wall(pos.row, pos.col)
+    # ==================== Board Manipulation ==================== #
 
     # ==================== Board status checkers ==================== #
+    def print_board(self):
+        def print_col_number():
+            print(f'  {Fore.CYAN}#{Fore.WHITE}', end='')
+            for i in range(self.width):
+                if i < 10:
+                    print(0, end='')
+                print(i, end=' ' if i < self.width-1 else '')
+            print(f'{Fore.CYAN}#{Style.RESET_ALL}')
+            return
+        def print_horizon_line():
+            print(f'{Fore.CYAN}{"#"*((self.width+1)*3+2)}{Style.RESET_ALL}')
+            return
+        
+        # header
+        print_col_number()
+        print_horizon_line()
+
+        # body
+        for r_idx, row in enumerate(self.board):
+            print(f'{Fore.WHITE}{"0" if r_idx < 10 else ""}{r_idx}{Fore.CYAN}#', end='')
+            print(Style.RESET_ALL, end='')
+            for c_idx, box in enumerate(row):
+                padding_col = ''
+                if c_idx < self.width-1:
+                    padding_col = ' '
+                    if isinstance(box, Node) and box.node_right is not None:
+                        padding_col = '-' if box.right_line_cnt == 1 else '='
+                    if isinstance(box, HorizonLine):
+                        padding_col = '-' if not box.is_double else '='
+                print(box, end=padding_col)
+            print(f'{Fore.CYAN}#{Fore.WHITE}{"0" if r_idx < 10 else ""}{r_idx}')
+            
+            # padding row
+            if r_idx == self.height-1:
+                continue
+            print(f'{Fore.CYAN}  #{Style.RESET_ALL}', end='')
+            for c_idx, box in enumerate(row):
+                col = '  '
+                if isinstance(box, Node) and box.node_bottom is not None:
+                    col = ' |' if box.bottom_line_cnt == 1 else '||'
+                if isinstance(box, VerticalLine):
+                    col = '||' if box.is_double else ' |'
+                print(col, end=' ' if c_idx < self.width-1 else '')
+            print(f'{Fore.CYAN}#{Style.RESET_ALL}')
+            
+        # footer
+        print_horizon_line()
+        print_col_number()
+    
     def is_finish(self) -> bool:
         """
             Check if all node has just enough line connected to it,\n
@@ -230,3 +165,106 @@ class Board:
                 return False
         return True
     # ==================== Board status checkers ==================== #
+    
+    # ==================== Board Generate ==================== #
+    def generate(self, _n:int):
+        """
+            Generate a new game board
+            Args:
+                `n`: number of node in the board
+        """
+        w = ceil(self.width/2)
+        h = ceil(self.height/2)
+        assert _n > 1 and _n <= w * h, f"Number of node of a {self.width}x{self.height} board must be between 2 and {w*h}"
+        
+        # first constrcut an board with size width/2 x height/2
+        temp_board = Board(w, h)
+        temp_board.board = [
+            [Box(row, col) for col in range(temp_board.width)] for row in range(temp_board.height)
+        ]
+
+        # choose first random node
+        _first_node = Node(randint(0, temp_board.height-1), randint(0, temp_board.width-1))
+        temp_board.board[_first_node.position.row][_first_node.position.col] = _first_node
+        temp_board.node_ls.append(_first_node)
+
+        # created nodes the can be connected to other nodes
+        _avai_node_set : set[Node] = set()        
+        _avai_node_set.add(_first_node)
+
+        # choose n-1 more boxes as node
+        for _ in range(_n-1):
+            # find a node and a direction that can create another node
+            _from_node : Node = None
+            _dir : Direction = None
+            while _from_node is None or _dir is None:
+                if len(_avai_node_set) == 0:
+                    break
+                
+                _node = choice(list(_avai_node_set))
+                
+                _avai_dir_ls = []
+                for _dir in _node.get_unlinked_dir():
+                    _b = temp_board.get_relative(_node, _dir)
+                    if _b is not None and _b.is_empty():
+                        _avai_dir_ls.append(_dir)
+                
+                if len(_avai_dir_ls) == 0:
+                    _avai_node_set.remove(_node)
+                    continue
+                                
+                _from_node = _node
+                _dir = choice(_avai_dir_ls)
+                
+            if len(_avai_node_set) == 0:
+                break
+                
+            # choose a random empty box in this direction
+            _empty_box_ls = []
+            _b = temp_board.get_relative(_from_node, _dir)
+            while _b is not None and _b.is_empty():
+                _empty_box_ls.append(_b)
+                _b = temp_board.get_relative(_b, _dir)
+            _box : Box = choice(_empty_box_ls)
+            
+            # convert box to node
+            _to_node = Node(_box.position.row, _box.position.col)
+            temp_board.board[_box.position.row][_box.position.col] = _to_node
+            _avai_node_set.add(_to_node)
+            temp_board.node_ls.append(_to_node)
+
+            # draw a line, and increase number of line of both node
+            temp_board.draw_line(_from_node, _to_node)
+            _from_node.n += 1
+            _to_node.n += 1
+            
+            # 50% chance to double it
+            if randint(0, 1) == 1:
+                temp_board.draw_line(_from_node, _to_node)
+                _from_node.n += 1
+                _to_node.n += 1
+                
+        # construct the real board by adding padding
+        self.board = []
+        for tr_idx, t_row in enumerate(temp_board.board):
+            row = []
+            r_idx = tr_idx * 2
+            for tc_idx, t_col in enumerate(t_row):
+                c_idx = tc_idx * 2
+                if isinstance(t_col, Node):
+                    node = Node(r_idx, c_idx)
+                    node.n = t_col.n
+                    self.node_ls.append(node)
+                    row.append(node)
+                else:
+                    row.append(Box(r_idx, c_idx))
+                
+                # padding col
+                if c_idx < self.width-1:
+                    row.append(Box(r_idx, c_idx+1))
+            self.board.append(row)
+            
+            # padding row
+            if r_idx < self.height-1:
+                self.board.append([Box(r_idx+1, c_idx) for c_idx in range(self.width)])
+    # ==================== Board Generate ==================== #
